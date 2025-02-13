@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Tilt and Rotate</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+        }
+        .start-button {
+            padding: 12px 20px;
+            background-color: #87CEEB;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+            transition: background-color 0.3s ease;
+        }
+        .start-button:hover {
+            background-color: #69b0d9;
+        }
+        .interactive-section {
+            display: none;
+            width: 100%;
+            margin-top: 20px;
+        }
+        #controls {
+            margin-top: 10px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .image-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+            gap: 20px;
+        }
+        .image-box {
+            text-align: center;
+        }
+        .image-box img {
+            width: 150px;
+            height: 150px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        .title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 5px;
+            color: #333;
+        }
+        #scene-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            
+        }
+        canvas {
+            display: block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Welcome Screen -->
+    <div class="container" id="welcome-screen">
+        <h1>Welcome to Image Tilt and Rotate</h1>
+        <p>Upload an image and apply tilt and rotation effects.</p>
+        <p>This tool allows you to upload an image, apply tilt and rotation, and view different perspectives of the image. Click the button below to get started.</p>
+        <ol>
+            Follow these instructions to run the code
+             <li>Upload an image and apply tilt/rotate transformations</li>
+             <li>Interactive main image with mouse zoom and pan</li>
+             <li>Four transformed images with labeled rotation/tilt angles</li>
+             <li>Individual export buttons for each output image</li>
+             <li>User-friendly UI with clean design and responsive layout</li>
+        </ol>
+        <button class="start-button" onclick="startApplication()">Start</button>
+    </div>
+
+    <!-- Interactive Section -->
+    <div class="interactive-section" id="interactive-section">
+        <h2>Interactive Image Tilt and Rotate</h2>
+        <div id="controls">
+            <input type="file" id="imageUpload" accept="image/*">
+            <p><strong>Rotate Image</strong></p>
+            <input type="range" id="rotateRange" min="0" max="360" step="1" value="0">
+            <p><strong>Tilt Image</strong></p>
+            <input type="range" id="tiltRange" min="-90" max="90" step="1" value="0">
+            <button onclick="resetImage()">Reset</button>
+        </div>
+        <div id="scene-container"></div>
+        <h3>Different Tilted Angles</h3>
+        <div class="image-container" id="side-images"></div>
+    </div>
+
+    <script>
+        function startApplication() {
+            document.getElementById("welcome-screen").style.display = "none";
+            document.getElementById("interactive-section").style.display = "block";
+            initScene();
+        }
+
+        let scene, camera, renderer, controls;
+        let imageMesh = null;
+        let rotateValue = 0, tiltValue = 0;
+
+        function initScene() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+            document.getElementById("scene-container").appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            camera.position.set(0, 1, 5);
+            camera.lookAt(0, 0, 0);
+            animate();
+        }
+
+        function loadImageTexture(file) {
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const textureLoader = new THREE.TextureLoader();
+                textureLoader.load(event.target.result, function (texture) {
+                    if (imageMesh) {
+                        scene.remove(imageMesh);
+                    }
+                    const geometry = new THREE.PlaneGeometry(4, 4);
+                    const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+                    imageMesh = new THREE.Mesh(geometry, material);
+                    scene.add(imageMesh);
+                    updateImageTransform();
+                    createSideImages(event.target.result);
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateImageTransform() {
+            if (imageMesh) {
+                imageMesh.rotation.z = THREE.MathUtils.degToRad(rotateValue);
+                imageMesh.rotation.x = THREE.MathUtils.degToRad(tiltValue);
+            }
+        }
+
+        function resetImage() {
+            rotateValue = 0;
+            tiltValue = 0;
+            document.getElementById("rotateRange").value = 0;
+            document.getElementById("tiltRange").value = 0;
+            updateImageTransform();
+        }
+
+        document.getElementById("rotateRange").addEventListener("input", function (event) {
+            rotateValue = event.target.value;
+            updateImageTransform();
+        });
+
+        document.getElementById("tiltRange").addEventListener("input", function (event) {
+            tiltValue = event.target.value;
+            updateImageTransform();
+        });
+
+        document.getElementById("imageUpload").addEventListener("change", function (event) {
+            if (event.target.files && event.target.files[0]) {
+                loadImageTexture(event.target.files[0]);
+            }
+        });
+
+        function createSideImages(imageSrc) {
+            const sideImagesContainer = document.getElementById("side-images");
+            sideImagesContainer.innerHTML = '';
+
+            const angles = [0, 90, 180, -90];
+            angles.forEach(angle => {
+                const sideImageDiv = document.createElement('div');
+                sideImageDiv.classList.add('image-box');
+
+                const sideImage = document.createElement('img');
+                sideImage.src = imageSrc;
+                sideImage.style.transform = `rotate(${angle}deg)`;
+
+                const title = document.createElement('div');
+                title.classList.add('title');
+                title.innerText = `Tilt: ${angle}°`;
+
+                sideImageDiv.appendChild(sideImage);
+                sideImageDiv.appendChild(title);
+                sideImagesContainer.appendChild(sideImageDiv);
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+
+</body>
+</html>
+ 
